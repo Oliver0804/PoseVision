@@ -101,7 +101,7 @@ def process_video(input_path, output_path):
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
-    torch.save(vectors_list, "vectors.pt")
+    torch.save(vectors_list, output_path+".pt")
     print(f"影像尺寸: {width}x{height}")
     print(f"總幀數: {total_frames}")
     cap.release()
