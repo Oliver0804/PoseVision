@@ -14,7 +14,7 @@ POSE_CONNECTIONS = [
     (15, 19), (15, 21), (15, 17)
 ]
 
-
+# 將 PNG 資料夾中的所有圖片合併成一個 MP4 檔案
 def pngs_to_mp4(png_folder, output_mp4, fps=30):
     images = [img for img in os.listdir(png_folder) if img.endswith(".png")]
     images.sort()  # 確保圖像是按正確的順序
@@ -34,7 +34,7 @@ def pngs_to_mp4(png_folder, output_mp4, fps=30):
     out.release()
 
 
-
+# 處理影片 
 def process_video(input_path, output_path):
     # 初始化姿勢估計物件
     mp_pose = mp.solutions.pose
@@ -42,10 +42,10 @@ def process_video(input_path, output_path):
 
     # 讀取影片
     cap = cv2.VideoCapture(input_path)
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps = int(cap.get(cv2.CAP_PROP_FPS))
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))# 影片尺寸
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))# 影片尺寸
+    fps = int(cap.get(cv2.CAP_PROP_FPS))# 幀率
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))# 總幀數
     scale_factor = 3
 
     # 創建影片寫入器
@@ -108,14 +108,20 @@ def process_video(input_path, output_path):
     out.release()
     cv2.destroyAllWindows()
 
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--in', dest='input', help='Input video path or PNG folder')
-    parser.add_argument('--out', dest='output', help='Output video path')
+    parser.add_argument('--out', dest='output', help='Output video path', default=None)  # 預設為None
     args = parser.parse_args()
 
     input_path = args.input
     output_video = args.output
+
+    # 如果使用者沒有提供output，根據input生成output名稱
+    if not output_video:
+        base_name, ext = os.path.splitext(input_path)
+        output_video = base_name + "_output.mp4"
 
     # 檢查輸入是資料夾還是 MP4
     if os.path.isdir(input_path):

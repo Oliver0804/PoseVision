@@ -30,9 +30,16 @@ python main.py --in <input_video_path> --out <output_video_path>
 ```
 請將 <input_video_path> 替換為您要處理的影片路徑，並將 <output_video_path> 替換為您想要的輸出影片名稱。
 
+
 您將看到程式正在運行並處理影片，同時在終端機上顯示關鍵點的移動向量數值。
 
 按下 q 鍵停止程式運行。
+
+
+資料夾最後不需要帶"/"
+```bash
+python main.py --in ./28October_2009_Wednesday_tagesschau-4534
+```
 
 ## 備註
 如果您想測試其他影片，請確保您的影片具有支援的格式和編解碼器。如果遇到播放或編碼問題，請檢查您的系統是否具有所需的多媒體套件和編解碼器。
