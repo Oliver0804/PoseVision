@@ -41,6 +41,10 @@ python main.py --in <input_video_path> --out <output_video_path>
 python main.py --in ./28October_2009_Wednesday_tagesschau-4534
 ```
 
+
+## pt
+會針對影像向量by frame記入成pt檔案
+
 ## 備註
 如果您想測試其他影片，請確保您的影片具有支援的格式和編解碼器。如果遇到播放或編碼問題，請檢查您的系統是否具有所需的多媒體套件和編解碼器。
 請確保您的系統上已經安裝了適用於 Python 3.11 的 conda 環境，並且按照指南中的步驟進行操作。
