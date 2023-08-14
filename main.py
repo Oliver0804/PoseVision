@@ -1,90 +1,99 @@
+import os
 import cv2
 import mediapipe as mp
 import numpy as np
 import time
 import argparse
+import torch
+
+POSE_CONNECTIONS = [
+    (0, 1), (1, 2), (2, 3), (3, 7), (0, 4), (4, 5),
+    (5, 6), (6, 8), (9, 10), (11, 12), (11, 13),
+    (13, 15), (12, 14), (14, 16), (4, 11), (1, 12),
+    (16, 20), (16, 22), (16, 18),
+    (15, 19), (15, 21), (15, 17)
+]
+
+
+def pngs_to_mp4(png_folder, output_mp4, fps=30):
+    images = [img for img in os.listdir(png_folder) if img.endswith(".png")]
+    images.sort()  # 確保圖像是按正確的順序
+
+    frame = cv2.imread(os.path.join(png_folder, images[0]))
+    height, width, layers = frame.shape
+
+    # 使用第一幅圖片的尺寸來設定輸出MP4的尺寸，並設定 fps 為 30
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = cv2.VideoWriter(output_mp4, fourcc, fps, (width, height))
+
+    for image in images:
+        img_path = os.path.join(png_folder, image)
+        frame = cv2.imread(img_path)
+        out.write(frame)
+
+    out.release()
+
+
 
 def process_video(input_path, output_path):
     # 初始化姿勢估計物件
     mp_pose = mp.solutions.pose
-    pose = mp_pose.Pose()
+    pose = mp_pose.Pose(static_image_mode=False, model_complexity=2, min_detection_confidence=0.5)
 
     # 讀取影片
     cap = cv2.VideoCapture(input_path)
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = int(cap.get(cv2.CAP_PROP_FPS))
-
-    # 儲存前一幀的關鍵點位置
-    prev_landmarks = None
-
-    # 視窗放大倍數
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     scale_factor = 3
 
     # 創建影片寫入器
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter(output_path, fourcc, fps, (width * scale_factor, height * scale_factor))
 
+    vectors_list = []
+    prev_landmarks = None
+
     while cap.isOpened():
         ret, frame = cap.read()
-
         if not ret:
             break
 
-        # 將視窗放大
         frame = cv2.resize(frame, (width * scale_factor, height * scale_factor))
-
-        # 將圖像轉換為RGB顏色空間
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-        # 執行姿勢估計
         results = pose.process(frame_rgb)
 
-        # 檢測到人體姿勢的關鍵點
         if results.pose_landmarks:
-            # 取得當前幀的關鍵點位置
-            landmarks = []
-            for landmark in results.pose_landmarks.landmark:
-                landmarks.append((landmark.x, landmark.y))
-
-            # 繪製關鍵點
-            for point in landmarks:
-                x = int(point[0] * frame.shape[1])
-                y = int(point[1] * frame.shape[0])
-                cv2.circle(frame, (x, y), 5, (0, 255, 0), -1)
-
-            # 計算移動向量
+            landmarks = [(landmark.x, landmark.y, landmark.z) for landmark in results.pose_landmarks.landmark]
+            for index, point in enumerate(landmarks):
+                x, y = int(point[0] * frame.shape[1]), int(point[1] * frame.shape[0])
+                cv2.circle(frame, (x, y), 10, (250, 255, 50), 2)
+                cv2.putText(frame, str(index), (x + 5, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 100, 200), 2)
+            
             if prev_landmarks is not None:
                 movement_vectors = np.array(landmarks) - np.array(prev_landmarks)
-
-                # 繪製移動向量
+                vectors_list.append(movement_vectors)
                 for point, vector in zip(landmarks, movement_vectors):
                     start_point = (int(point[0] * frame.shape[1]), int(point[1] * frame.shape[0]))
                     end_point = (int((point[0] + vector[0]) * frame.shape[1]), int((point[1] + vector[1]) * frame.shape[0]))
-
-                    # 計算向量的絕對值
-                    vector_length = np.linalg.norm(vector)
-                    scale_vector_length = vector_length * 500
-                    # 根據向量大小設定箭頭顏色
-                    if scale_vector_length > 10:
-                        print("Red")
+                    vector_length = np.linalg.norm(vector) * 500
+                    color = (0, 255, 0)  # 綠色
+                    if vector_length > 10:
                         color = (0, 0, 255)  # 紅色
-                    elif scale_vector_length > 5:
-                        print("Orange")
+                    elif vector_length > 5:
                         color = (0, 165, 255)  # 橘色
-                    else:
-                        print("Green")
-                        color = (0, 255, 0)  # 綠色
-
                     cv2.arrowedLine(frame, start_point, end_point, color, 2)
 
-                    # 打印移動向量數值
-                    print(f"Keypoint: {point}, Vector: {vector}")
-
-            # 儲存當前幀的關鍵點位置，供下一幀使用
             prev_landmarks = landmarks
 
-        # 顯示結果
+            for connection in POSE_CONNECTIONS:
+                start_idx, end_idx = connection
+                if start_idx < len(landmarks) and end_idx < len(landmarks):
+                    start_point = (int(landmarks[start_idx][0] * frame.shape[1]), int(landmarks[start_idx][1] * frame.shape[0]))
+                    end_point = (int(landmarks[end_idx][0] * frame.shape[1]), int(landmarks[end_idx][1] * frame.shape[0]))
+                    cv2.line(frame, start_point, end_point, (255, 255, 255), 2)
+
         cv2.imshow('Pose Estimation', frame)
         out.write(frame)
         time.sleep(0.05)
@@ -92,18 +101,27 @@ def process_video(input_path, output_path):
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
+    torch.save(vectors_list, "vectors.pt")
+    print(f"影像尺寸: {width}x{height}")
+    print(f"總幀數: {total_frames}")
     cap.release()
     out.release()
     cv2.destroyAllWindows()
 
 if __name__ == '__main__':
-    # 解析命令行參數
     parser = argparse.ArgumentParser()
-    parser.add_argument('--in', dest='input', help='Input video path')
+    parser.add_argument('--in', dest='input', help='Input video path or PNG folder')
     parser.add_argument('--out', dest='output', help='Output video path')
     args = parser.parse_args()
 
-    # 使用命令行參數執行影片處理
-    input_video = args.input
+    input_path = args.input
     output_video = args.output
-    process_video(input_video, output_video)
+
+    # 檢查輸入是資料夾還是 MP4
+    if os.path.isdir(input_path):
+        temp_mp4 = "temp_video.mp4"
+        pngs_to_mp4(input_path, temp_mp4)
+        process_video(temp_mp4, output_video)
+        os.remove(temp_mp4)  # 刪除暫時的 MP4 檔案
+    else:
+        process_video(input_path, output_video)
