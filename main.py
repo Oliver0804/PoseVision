@@ -3,11 +3,19 @@ import cv2
 import mediapipe as mp
 import numpy as np
 import argparse
+import pandas as pd
+from googletrans import Translator
+
+translator = Translator()
 
 mp_pose = mp.solutions.pose
 mp_hands = mp.solutions.hands
 
-# 将PNG图像合并成一个MP4文件
+def load_csv_data(csv_file, folder_name):
+    df = pd.read_csv(csv_file, delimiter='|')
+    match = df[df['name'].str.contains(folder_name)].iloc[0]
+    return match['orth'], match['translation']
+
 def pngs_to_mp4(png_folder, output_mp4, fps=30):
     images = [img for img in os.listdir(png_folder) if img.endswith(".png")]
     images.sort()
@@ -20,9 +28,8 @@ def pngs_to_mp4(png_folder, output_mp4, fps=30):
         out.write(frame)
     out.release()
 
-# 处理视频
-# 处理视频函数
-def process_video(input_path, output_path):
+def process_video(input_path, output_path, csv_file, folder_name):
+    orth, translation = load_csv_data(csv_file, folder_name)
     pose = mp_pose.Pose(min_detection_confidence=0.5)
     hands = mp_hands.Hands(min_detection_confidence=0.5)
     cap = cv2.VideoCapture(input_path)
@@ -32,11 +39,17 @@ def process_video(input_path, output_path):
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = int(cap.get(cv2.CAP_PROP_FPS))
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+    out = cv2.VideoWriter(output_path, fourcc, fps, (width * 2, height * 2))
 
     last_frame_landmarks = {}
     vectors_list = []
-
+        # 翻譯文字
+    translation_en = translator.translate(orth, dest='en').text
+    translation_zh_tw = translator.translate(orth, dest='zh-tw').text
+    print (orth)
+    print(translation)
+    print(translation_en)
+    print(translation_zh_tw)
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
@@ -72,10 +85,14 @@ def process_video(input_path, output_path):
                     end_point = (int(value[0] * width), int(value[1] * height))
                     cv2.line(frame, start_point, end_point, (0, 0, 255), 2)  # Red line for vector
 
-        last_frame_landmarks = current_frame_landmarks
 
-        out.write(frame)
-        cv2.imshow('Video Feed', frame)
+
+        # Resize frame to double the size
+        frame_resized = cv2.resize(frame, (width * 2, height * 2))
+
+        last_frame_landmarks = current_frame_landmarks
+        out.write(frame_resized)
+        cv2.imshow('Video Feed', frame_resized)
         if cv2.waitKey(5) & 0xFF == 27:
             break
 
@@ -84,12 +101,12 @@ def process_video(input_path, output_path):
     cv2.destroyAllWindows()
     return vectors_list
 
-
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--in', dest='input', help='Input video path or PNG folder')
     parser.add_argument('--out', dest='output', help='Output video path', default=None)
+    parser.add_argument('--csv', dest='csv_file', help='Path to the CSV file')
+    parser.add_argument('--folder', dest='folder_name', help='Folder name to match in CSV')
     args = parser.parse_args()
 
     input_path = args.input
@@ -98,8 +115,8 @@ if __name__ == '__main__':
     if os.path.isdir(input_path):
         temp_mp4 = "temp_video.mp4"
         pngs_to_mp4(input_path, temp_mp4)
-        vectors = process_video(temp_mp4, output_video)
+        vectors = process_video(temp_mp4, output_video, args.csv_file, args.folder_name)
         os.remove(temp_mp4)
     else:
-        vectors = process_video(input_path, output_video)
+        vectors = process_video(input_path, output_video, args.csv_file, args.folder_name)
     print(f"Total vectors captured: {len(vectors)}")
