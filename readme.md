@@ -27,6 +27,7 @@ pip install -r
 執行以下命令以運行程式：
 ```bash
 python main.py --in <input_video_path> --out <output_video_path>
+python main.py --in ./28October_2009_Wednesday_tagesschau-4534 --csv PHOENIX-2014-T.train-complex-annotation.corpus.csv --folder .
 ```
 請將 <input_video_path> 替換為您要處理的影片路徑，並將 <output_video_path> 替換為您想要的輸出影片名稱。
 
