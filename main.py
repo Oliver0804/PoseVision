@@ -55,7 +55,6 @@ def pngs_to_mp4(png_folder, output_mp4, fps=30):
         out.write(frame)
     out.release()
     return True
-
 def save_vectors_to_csv(vectors_data, input_path, folder_name):
     """
     將 vectors_data 轉換為 DataFrame 並保存為 CSV 檔案。
@@ -64,19 +63,18 @@ def save_vectors_to_csv(vectors_data, input_path, folder_name):
     :param input_path: 輸入檔案的路徑，用於確定 CSV 檔案的保存位置
     :param folder_name: 資料夾名稱，用於命名 CSV 檔案
     """
-    import pandas as pd
     # 將 vectors_data 轉換為 DataFrame
     df = pd.DataFrame(vectors_data)
 
     # 將 DataFrame 保存為 CSV 檔案
     csv_output_path = os.path.join(os.path.dirname(input_path), f"{folder_name}_vectors_data.csv")
-    df.to_csv(csv_output_path, index=False, float_format='%.8f')  # 使用 float_format 格式化小數點表示法
+    df.to_csv(csv_output_path, index=False)
     print(Fore.GREEN + f"CSV file saved to: {csv_output_path}")
 
 def process_video(input_path, output_path, csv_file, folder_name):
     # 初始化 frame_number
     frame_number = 0
-
+    vectors_list = [] 
     # 初始化總向量動能列表
     total_vector_energy_list = []
     orth, translation = load_csv_data(csv_file, folder_name)
@@ -84,7 +82,7 @@ def process_video(input_path, output_path, csv_file, folder_name):
     hands = mp_hands.Hands(min_detection_confidence=0.5)
 
     
-        
+    
 
     cap = cv2.VideoCapture(input_path)
     if not cap.isOpened():
@@ -98,7 +96,8 @@ def process_video(input_path, output_path, csv_file, folder_name):
     
 
     last_frame_landmarks = {}
-    vectors_list = []
+    
+    
     # 翻譯文字
     translation_en = translator.translate(orth, dest='en').text
     translation_zh_tw = translator.translate(orth, dest='zh-tw').text
@@ -183,6 +182,13 @@ def process_video(input_path, output_path, csv_file, folder_name):
         if cv2.waitKey(5) & 0xFF == 27:
             break
 
+        # 釋放當前幀的記憶體
+        del frame
+        del frame_rgb
+        del results_pose
+        del results_hands
+        del current_frame_landmarks
+
     cap.release()
     out.release()
     cv2.destroyAllWindows()
@@ -193,7 +199,7 @@ def process_video(input_path, output_path, csv_file, folder_name):
     plt.xlabel('Frame Number : '+folder_name)
     plt.ylabel('Total Vector Energy')
     plt.title('Total Vector Energy Over Time')
-    #plt.savefig(folder_name+'.png')
+    plt.savefig(folder_name+'.png')
 
     #plt.show()
     # 將 vectors_data 轉換為 DataFrame
@@ -203,6 +209,12 @@ def process_video(input_path, output_path, csv_file, folder_name):
     if os.path.exists(input_path):
         os.remove(input_path)
         print(Fore.RED + f"Original video file {input_path} has been deleted.")
+    
+    #vectors_list.clear()
+
+    del total_vector_energy_list
+    
+    del last_frame_landmarks
 
     return vectors_list
 
@@ -246,7 +258,7 @@ def process_all_videos(base_dir, annotations_dir):
                 
                 # 如果沒有 .mp4 檔案，檢查是否有 .png 檔案並轉換成 .mp4
                 if not video_file:
-                    output_mp4 = os.path.join(dir_path, f"{dir_name}_output.mp4")
+                    output_mp4 = os.path.join(dir_path, f"{dir_name}.mp4")
                     if pngs_to_mp4(dir_path, output_mp4):
                         video_file = output_mp4
                         print(Fore.YELLOW + f"Converted PNGs to video: {video_file}")
@@ -261,6 +273,9 @@ def process_all_videos(base_dir, annotations_dir):
                 vectors = process_video(video_file, output_video, csv_file, folder_name)
                 print(Fore.GREEN + f"Total vectors captured: {len(vectors)}")
                 
+                # 釋放資源
+                cv2.destroyAllWindows()
+                del vectors
                 # 更新並打印進度
                 processed_dirs += 1
                 progress = (processed_dirs / total_dirs) * 100
